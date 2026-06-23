@@ -195,7 +195,7 @@ class SimpleMixer {
   const double eps_ = 1e-8;
 
   double zero_throttle_threshold_;
-  std::array<ThrusterModel, 2> thruster_models_;
+  std::array<ThrusterModel, 2> thruster_models_{};
   bool compensate_deadzone_{false};
   // used as a scaler to normalize the motor command
   double max_rotations_per_second_{1.0};
