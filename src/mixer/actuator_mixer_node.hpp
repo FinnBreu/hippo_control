@@ -51,7 +51,7 @@ class ActuatorMixerNode : public rclcpp::Node {
 
   rclcpp::TimerBase::SharedPtr watchdog_timer_;
 
-  std::array<double, mixer::InputChannels::kCount> inputs_;
+  std::array<double, mixer::InputChannels::kCount> inputs_{};
   rclcpp::Time t_last_thrust_setpoint_;
   rclcpp::Time t_last_torque_setpoint_;
 };

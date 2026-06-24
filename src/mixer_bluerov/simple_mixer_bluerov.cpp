@@ -207,6 +207,17 @@ Eigen::Matrix<double, size_output, 1> SimpleMixer::ResolveDeadzone(
     return thrusters;
   }
 }
+// TODO(Nathalie):
+// Apply dead-zone compensation independently to the horizontal
+// [tau_z, F_x, F_y] and vertical [tau_x, tau_y, F_z] submixers.
+//
+// Currently, a command active in one subgroup can cause null-space
+// compensation thrust in the inactive subgroup. For example, F_z-only
+// commands can produce nonzero horizontal-thruster commands, and yaw-only
+// commands can produce nonzero vertical-thruster commands.
+//
+// Inactive subgroups must bypass ResolveDeadzone(), output zero commands,
+// and reset their corresponding last-output state.
 void SimpleMixer::ApplyDeadZoneCompensation(
     const std::array<double, InputChannels::kCount> &_actuator_controls,
     double _lower_limit, double _upper_limit) {

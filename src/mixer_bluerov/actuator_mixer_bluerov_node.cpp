@@ -11,7 +11,7 @@ static constexpr int kTimeoutMs = 300;
 namespace hippo_control {
 namespace mixer_bluerov {
 
-ActuatorMixerNode::ActuatorMixerNode(rclcpp::NodeOptions const &_options)
+ActuatorMixerNode::ActuatorMixerNode(rclcpp::NodeOptions const& _options)
     : Node("actuator_command_mixer", _options) {
   RCLCPP_INFO(get_logger(), "Declaring Paramters");
   DeclareParams();
@@ -48,56 +48,65 @@ void ActuatorMixerNode::WatchdogTimeout() {
   auto t_now = now();
   static bool timed_out_thrusts_prev{false};
   static bool timed_out_torques_prev{false};
-  bool timed_out_thrusts{false};
-  bool timed_out_torques{false};
+  const bool timed_out_thrusts =
+      (t_now - t_last_thrust_setpoint_).nanoseconds() * 1e-6 > kTimeoutMs;
 
-  if ((t_now - t_last_thrust_setpoint_).nanoseconds() * 1e-6 > kTimeoutMs) {
+  const bool timed_out_torques =
+      (t_now - t_last_torque_setpoint_).nanoseconds() * 1e-6 > kTimeoutMs;
+
+  bool inputs_changed = false;
+
+  if (timed_out_thrusts) {
     ResetThrust();
-    timed_out_thrusts = true;
-  }
-  if ((t_now - t_last_torque_setpoint_).nanoseconds() * 1e-6 >
-             kTimeoutMs) {
-    ResetTorque();
-    timed_out_torques = true;
-  }
 
-  if (timed_out_thrusts && !timed_out_thrusts_prev) {
-    RCLCPP_WARN_STREAM(get_logger(),
-                       "Thrust input messages timed out. Setting thrusts to zero.");
-  } else if (!timed_out_thrusts && timed_out_thrusts_prev) {
+    if (!timed_out_thrusts_prev) {
+      RCLCPP_WARN_STREAM(
+          get_logger(),
+          "Thrust input messages timed out. Setting thrusts to zero.");
+      inputs_changed = true;
+    }
+  } else if (timed_out_thrusts_prev) {
     RCLCPP_INFO(get_logger(),
                 "Received new thrust input messages. Not timed out anymore.");
   }
-    if (timed_out_torques && !timed_out_torques_prev) {
-    RCLCPP_WARN_STREAM(get_logger(),
-                       "Torque input messages timed out. Setting torques to zero.");
-  } else if (!timed_out_torques && timed_out_torques_prev) {
+
+  if (timed_out_torques) {
+    ResetTorque();
+
+    if (!timed_out_torques_prev) {
+      RCLCPP_WARN_STREAM(
+          get_logger(),
+          "Torque input messages timed out. Setting torques to zero.");
+      inputs_changed = true;
+    }
+  } else if (timed_out_torques_prev) {
     RCLCPP_INFO(get_logger(),
                 "Received new torque input messages. Not timed out anymore.");
   }
 
-  if (timed_out_thrusts && timed_out_torques) {
-    PublishZeroActuatorCommand(t_now);
+  if (inputs_changed) {
+    PublishActuatorCommand(t_now);
   }
+
   timed_out_thrusts_prev = timed_out_thrusts;
   timed_out_torques_prev = timed_out_torques;
 }
 
-void ActuatorMixerNode::PublishActuatorCommand(const rclcpp::Time &_now) {
+void ActuatorMixerNode::PublishActuatorCommand(const rclcpp::Time& _now) {
   hippo_control_msgs::msg::ActuatorControls msg;
   msg.control = mixer_.Mix(inputs_);
   msg.header.stamp = _now;
   actuator_controls_pub_->publish(msg);
 }
 
-void ActuatorMixerNode::PublishZeroActuatorCommand(const rclcpp::Time &_now) {
-  hippo_control_msgs::msg::ActuatorControls msg;
-  for (double &control:msg.control) {
-    control = 0.0;
-  }
-  msg.header.stamp = _now;
-  actuator_controls_pub_->publish(msg);
-}
+// void ActuatorMixerNode::PublishZeroActuatorCommand(const rclcpp::Time& _now) {
+//   hippo_control_msgs::msg::ActuatorControls msg;
+//   for (double& control : msg.control) {
+//     control = 0.0;
+//   }
+//   msg.header.stamp = _now;
+//   actuator_controls_pub_->publish(msg);
+// }
 
 void ActuatorMixerNode::ResetThrust() {
   inputs_[mixer_bluerov::InputChannels::kThrustX] = 0.0;
@@ -143,7 +152,7 @@ void ActuatorMixerNode::OnTorqueSetpoint(
 }  // namespace mixer_bluerov
 }  // namespace hippo_control
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<hippo_control::mixer_bluerov::ActuatorMixerNode>(
       rclcpp::NodeOptions());
